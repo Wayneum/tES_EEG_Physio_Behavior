@@ -90,7 +90,8 @@ channel_label <- EEG_0101_raw_data[["DSamp"]][[6]]
 # Create a data frame for plotting(test)
 
 test_channel_range <- 1:3
-test_sample_range <- 1:600000   #. 10 min
+test_sample_range <- 1:600000 #. 10 minutes
+
 
 
 eeg_subset <- EEG_data_0101[test_channel_range, test_sample_range]
@@ -105,6 +106,54 @@ plot_test_df$Channel <- factor(plot_test_df$Channel,
                                       levels = c("Ch1", "Ch2", "Ch3"),
                                       labels = channel_labels)
 
+
+
+
+
+```
+
+```{r}
+## create dataframe and export as CSV file
+
+create_sub_df_fun<- function(EEG_dataset, EEG_time_dataset , channel_range_variable, time_range_variable){
+  eeg_subset <- EEG_dataset[channel_range_variable, time_range_variable]
+  time_subset <- EEG_time_dataset[time_range_variable]
+  test_channel_label <- channel_label[channel_range_variable]
+  channel_labels <- sapply(test_channel_label, function(x) x[[1]])
+  
+  internal_fun_df <- data.frame(Time = rep(time_subset, times = length(channel_range_variable)),
+                   Channel = factor(rep(paste0("Ch", channel_range_variable), each = length(time_range_variable)), 
+                   levels = paste0("Ch", channel_range_variable), labels = channel_labels),
+  Voltage = as.vector(t(eeg_subset)))
+
+  return (internal_fun_df)
+}
+
+#combine the function of create_sub_df_function and output_csv_ fun 
+create_sub_df_and_export_csv <- function(EEG_dataset, EEG_time_dataset , channel_range_variable, time_range_variable, CSV_name){
+  internal_create_df <- create_sub_df_fun(EEG_dataset, EEG_time_dataset , channel_range_variable, time_range_variable)
+  output_csv_fun(internal_create_df, CSV_name)
+}
+
+
+# export all dataframe and save in one csv file 
+create_sub_df_and_export_csv(EEG_data_0101, EEG_time_0101,1:35, 1:4227788, "EEG_all_channel_all_time.csv")
+
+# export each channel data frame and save  csv file
+export_specific_channel <- function(channel_number){
+  test_channel_label <- channel_label[channel_number]
+  channel_labels <- sapply(test_channel_label, function(x) x[[1]])
+  export_name_for_csv <- paste0("EEG_",channel_labels,"_all_time.csv")
+  export_x <- create_sub_df_fun(EEG_data_0101,EEG_time_0101, channel_number, 1:4227788)
+  output_csv_fun(export_x,export_name_for_csv)
+}
+
+for (ch in 1:35) {
+  export_specific_channel(ch)
+}
+
+
+
 ```
 
 ### Calculate mean values for each channel
@@ -115,22 +164,99 @@ plot_test_df_binned <- plot_test_df %>%
   summarize(mean_voltage = mean(Voltage, na.rm = TRUE), .groups = "drop")
 
 
-
-
-
-
 ```
 
-# Create interactive plot
+### Create interactive plot
 ```{r}
 EEG_0101_interactive_plot_test <- plot_ly() %>%
   add_trace(data = plot_test_df, x = plot_test_df$Time, y = plot_test_df$Voltage, color = plot_test_df$Channel, type = 'scatter', mode = 'lines') %>% 
   layout(title = "Interactive plot between first 3 channels over ten minutes", xaxis = list(title = "Time (sec)"), yaxis = list(title = "Voltage"))
 EEG_0101_interactive_plot_test
 
-#EEG_0101_interactive_plot_test %>% add_trace(data= plot_test_df_binned, x = ~Time_bin, y = ~mean_voltage, type = 'scatter', mode = 'lines' )
-## ???
+
 ```
 
+
+# tansfore the plot_test_df to CSV formate
+```{r}
+# output Long Format to csv file
+filter_data_frame <- function(input_dataFrame, filter_variable) {
+  # Filter the data frame where Channel matches filter_variable
+  filtered_df <- input_dataFrame[input_dataFrame$Channel == filter_variable, ]
+  return(filtered_df)
+}
+combine_fun <- function (origin_df, target_df){
+  temp_df = data.frame()
+  
+}
+
+test_Fp1_df <- filter_data_frame(plot_test_df,"Fp1")
+test_Fpz_df <- filter_data_frame(plot_test_df, "Fpz")
+test_Fp2_df <- filter_data_frame(plot_test_df, "Fp2")
+
+channel_name_label_fun <- function(channel_name){
+  out_put = paste0("Voltage_", channel_name)
+  return (out_put)
+  }
+
+combine_test_df_fun <- function(to_df, target1_df, target2_df){ 
+  to_df_name <- unique(to_df$Channel)
+  target1_df_name <- unique(target1_df$Channel)
+  target2_df_name <- unique(target2_df$Channel)
+  to_df <- to_df[, c("Time", "Voltage")]
+  df1 <- target1_df[, c("Time", "Voltage")]
+  df2 <- target2_df[, c("Time", "Voltage")]
+  names(to_df)[2] <- channel_name_label_fun(to_df_name)
+  names(df1)[2] <-channel_name_label_fun(target1_df_name)
+  names(df2)[2] <-channel_name_label_fun(target2_df_name)
+  combined_df <- merge(to_df, df1,by = "Time")
+  combined_df <- merge(combined_df, df2,by = "Time" )
+  return (combined_df)
+}
+
+combined_three_df <- combine_test_df_fun(test_Fp1_df,test_Fp2_df,test_Fpz_df)
+head(combined_three_df)
+
+output_csv_fun <- function(input_df, csv_name){
+  write.csv(input_df, file = csv_name, row.names = FALSE)
+}
+
+
+output_csv_fun(plot_test_df, "test_multiple_channel.csv")
+output_csv_fun(test_Fp1_df, "test_Fp1_output.csv")
+output_csv_fun(test_Fp1_df, "test_Fpz_output.csv")
+output_csv_fun(test_Fp1_df, "test_Fp2_output.csv")
+output_csv_fun(combined_three_df, "Fp1_Fpz_Fp2_output.csv")
+
+
+```
+
+### Generate the kime-phases
+```{r}
+head(test_Fp1_df)
+head(test_Fp2_df)
+head(test_Fpz_df)
+
+phi_8_vec <- matrix(NA, ncol=10, nrow = 8)
+for (t in 1:10) { 
+  # for a given t, generate 8 new phases
+  set.seed(t);
+  phi_8_vec[ ,t] <-
+    extraDistr::rlaplace(8, mu=0, sigma=0.5)
+  # rank-order the phases for consistency
+  # within the same foliation leaf
+  phi_8_vec[ ,t] <- sort(phi_8_vec[ ,t])
+  # force phases in [-pi: pi)
+  for (i in 1:8) {
+    if (phi_8_vec[i,t] < -pi) 
+      phi_8_vec[i,t] <- -pi
+    if (phi_8_vec[i,t] >= pi) 
+      phi_8_vec[i,t] <- pi
+  }
+}
+
+
+
+```
 
 ```{r}
