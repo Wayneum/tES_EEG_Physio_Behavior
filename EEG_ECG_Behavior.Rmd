@@ -2,6 +2,9 @@
 title: 'The Spacekime Analytics of EEG, ECG, and Behavior with Multiple Doses of tDCS'
 author: "<h3>SOCR/MIDAS (Yuan-Yu Lin)</h3>"
 date: "`r format(Sys.time(), '%B %Y')`"
+editor_options: 
+  markdown: 
+    wrap: 72
 ---
 
 ```{r}
@@ -18,6 +21,8 @@ library(R.matlab)
 library(plotly)
 library(dplyr)
 library(tidyr)
+library(spatstat)
+library(akima)
 
 ```
 
@@ -52,17 +57,21 @@ str(behavioral_CTT_0101_raw_data)
 
 #### DSamp
 
-triggers \<- These are all the labeled EEG/Stimulation start/stop triggers
+triggers \<- These are all the labeled EEG/Stimulation start/stop
+triggers
 
-EEGdata \<- Contains the downsampled EEG/ECG/EOG voltage data dims: 35 channelss X \~4E6 samples
+EEGdata \<- Contains the downsampled EEG/ECG/EOG voltage data dims: 35
+channelss X \~4E6 samples
 
-fs \<- The downsampled sampling frequency of the data : 1000 Hz. #####1000 samples per second.
+fs \<- The downsampled sampling frequency of the data : 1000 Hz.
+#####1000 samples per second.
 
 fsOld \<- The original sampling frequency of the data
 
 time \<- Time vector for the data. Should be 1 X \~4E6
 
-label \<- Contains the channel label information. BIP1= ECG, BIP2=EOG, RESP1= N/A
+label \<- Contains the channel label information. BIP1= ECG, BIP2=EOG,
+RESP1= N/A
 
 nchan \<- The number of channels in the data
 
@@ -70,14 +79,15 @@ rate \<- Redundant to fs, sampling rate of data
 
 npt \<- Number of data points \~4E6
 
-Subj \<- Subject and session that data belong to. I.e. 0302 - Subject 03 session 03
+Subj \<- Subject and session that data belong to. I.e. 0302 - Subject 03
+session 03
 
 ptrackerPerf \<- The CTT data deviation/ the behavioral data
 
 ptrackerTime \<- Time vector for the CTT data
 
-ptrackerfs \<- The sampling frequency for the CTT data 100 Hz.
-(source: https://github.com/ngebodh/GX_tES_EEG_Physio_Behavior)
+ptrackerfs \<- The sampling frequency for the CTT data 100 Hz. (source:
+<https://github.com/ngebodh/GX_tES_EEG_Physio_Behavior>)
 
 ```{r}
 ## Prepare the data for analyze
@@ -137,6 +147,10 @@ create_sub_df_and_export_csv <- function(EEG_dataset, EEG_time_dataset , channel
 
 
 # export all dataframe and save in one csv file 
+output_csv_fun <- function(input_df, csv_name){
+  write.csv(input_df, file = csv_name, row.names = FALSE)
+}
+
 create_sub_df_and_export_csv(EEG_data_0101, EEG_time_0101,1:35, 1:4227788, "EEG_all_channel_all_time.csv")
 
 # export each channel data frame and save  csv file
@@ -157,6 +171,7 @@ for (ch in 1:35) {
 ```
 
 ### Calculate mean values for each channel
+
 ```{r}
 plot_test_df_binned <- plot_test_df %>%
   mutate(Time_bin = round(Time, 2)) %>%  # rounds time to 0.01s
@@ -167,6 +182,7 @@ plot_test_df_binned <- plot_test_df %>%
 ```
 
 ### Create interactive plot
+
 ```{r}
 EEG_0101_interactive_plot_test <- plot_ly() %>%
   add_trace(data = plot_test_df, x = plot_test_df$Time, y = plot_test_df$Voltage, color = plot_test_df$Channel, type = 'scatter', mode = 'lines') %>% 
@@ -176,8 +192,8 @@ EEG_0101_interactive_plot_test
 
 ```
 
+# transfer the plot_test_df to CSV format
 
-# tansfore the plot_test_df to CSV formate
 ```{r}
 # output Long Format to csv file
 filter_data_frame <- function(input_dataFrame, filter_variable) {
@@ -217,9 +233,6 @@ combine_test_df_fun <- function(to_df, target1_df, target2_df){
 combined_three_df <- combine_test_df_fun(test_Fp1_df,test_Fp2_df,test_Fpz_df)
 head(combined_three_df)
 
-output_csv_fun <- function(input_df, csv_name){
-  write.csv(input_df, file = csv_name, row.names = FALSE)
-}
 
 
 output_csv_fun(plot_test_df, "test_multiple_channel.csv")
@@ -232,22 +245,71 @@ output_csv_fun(combined_three_df, "Fp1_Fpz_Fp2_output.csv")
 ```
 
 ### Generate the kime-phases
-```{r}
-head(test_Fp1_df)
-head(test_Fp2_df)
-head(test_Fpz_df)
 
-phi_8_vec <- matrix(NA, ncol=10, nrow = 8)
-for (t in 1:10) { 
+```{r}
+Fp1_10min_df <- create_sub_df_fun(EEG_data_0101,EEG_time_0101, 1:1, 1:600000)
+Fp1_20min_df <- create_sub_df_fun(EEG_data_0101,EEG_time_0101, 1:1, 600001:1200000)
+Fp1_30min_df <- create_sub_df_fun(EEG_data_0101,EEG_time_0101, 1:1, 120001:1800000)
+Fp1_40min_df <- create_sub_df_fun(EEG_data_0101,EEG_time_0101, 1:1, 1800001:2400000)
+Fp1_50min_df <- create_sub_df_fun(EEG_data_0101,EEG_time_0101, 1:1, 2400001:3600000)
+Fp1_60min_df <- create_sub_df_fun(EEG_data_0101,EEG_time_0101, 1:1, 3600001:4200000)
+Fp1_70min_df <- create_sub_df_fun(EEG_data_0101,EEG_time_0101, 1:1, 4200001:length(length(EEG_data_0101[1:1,])))
+
+
+output_csv_fun(Fp1_10min_df, "Fp1_10min.csv")
+output_csv_fun(Fp1_20min_df, "Fp1_20min.csv")
+output_csv_fun(Fp1_30min_df, "Fp1_30min.csv")
+output_csv_fun(Fp1_40min_df, "Fp1_40min.csv")
+output_csv_fun(Fp1_50min_df, "Fp1_50min.csv")
+output_csv_fun(Fp1_60min_df, "Fp1_60min.csv")
+output_csv_fun(Fp1_70min_df, "Fp1_70min.csv")
+
+
+```
+
+
+
+
+```{r}
+## testing !!!
+
+### create the 3D kimesurfaces for 0.1 minutes of fp1 channel 
+#  Fp1_10min_df is 600000 obs. of  3 variables(Time, channel name, voltage)
+#  Time - 1000Hz
+#  channel name - Fp1
+#  voltage - each 0.001 sec's voltage of EEG
+
+
+## 0521
+file_name = "exp1_0101_Fp1"
+Fp1_path<- file.path(file_name, "Fp1_10min.csv")
+Fp1_10min_df <- read.csv(Fp1_path)
+
+
+# head(Fp1_10min_df) ## 600000 obs. of  3 variables:
+
+slice_fp1 = split(Fp1_10min_df, ceiling(seq_along(1:nrow(Fp1_10min_df)) / 100)) # 0.1 sec 
+
+fp1_time = slice_fp1[[1]]$Time     ## 60000 obs. of  3 variables
+length_time = length(fp1_time)   # should small than 100
+
+# # Generate 8 kime-phases meet 
+##  # randomly generate 8 phi kime-phases for each of the 100 time
+num_row <- 8
+num_col <- 100  
+
+phi_8_vec <- matrix(NA, ncol=num_col, nrow = num_row)
+#if(rand_opt=="laplace"){
+for (t in 1:num_col) { 
   # for a given t, generate 8 new phases
   set.seed(t);
   phi_8_vec[ ,t] <-
-    extraDistr::rlaplace(8, mu=0, sigma=0.5)
+    extraDistr::rlaplace(num_row,mu=0,sigma=0.5)
   # rank-order the phases for consistency
   # within the same foliation leaf
   phi_8_vec[ ,t] <- sort(phi_8_vec[ ,t])
   # force phases in [-pi: pi)
-  for (i in 1:8) {
+  for (i in 1:num_row) {
     if (phi_8_vec[i,t] < -pi) 
       phi_8_vec[i,t] <- -pi
     if (phi_8_vec[i,t] >= pi) 
@@ -255,8 +317,358 @@ for (t in 1:10) {
   }
 }
 
+voltage= slice_fp1[[1]]$Voltage
+
+
+# reconstructed the data frame
+phi_containter <- NULL
+for (i in 1:num_row) {
+  phi_containter <- c(phi_containter, phi_8_vec[i])
+}
+
+phi_containter <- as.vector(phi_8_vec)  
+time_vec <- rep(1:num_col, each = num_row)  
+source_vec <- rep(1:num_row, times = num_col) 
+
+reconstruct_df <- data.frame(time = time_vec, source = source_vec, phi = phi_containter, voltage = voltage)
+# head(reconstruct_df)
+
+
+
+#set plotly matrix  211 * 211 kime-domain Cartesian
+
+matrix_size <- num_col* 2 +11  # 111
+half_matrix_size <- (matrix_size-1)/2   # 105
+matrix_Fp1_10 <- matrix(NA, nrow=matrix_size, ncol = matrix_size) # size = 211 * 211
+
+#  using phase-based x-y coordinates to fill the matrix_Fp1_10
+for (t in 1:num_col) {
+  for (p in 1:num_row) {
+    x = half_matrix_size+1+t*cos(phi_8_vec[p,t])
+    y = half_matrix_size+1+t*sin(phi_8_vec[p,t])
+    matrix_Fp1_10[x,y]  <- voltage[(p-1)*num_col +t]
+  }
+}
+
+
+# Reduce the noise, sigma = 5
+matrix_Fp1_10_smooth <- (1/10000)*as.matrix(blur(as.im(matrix_Fp1_10), sigma=5))
+# max(matrix_Fp1_10_smooth)
+# 2.275602e-15
+# min(matrix_Fp1_10_smooth)
+#  -2.153322
+
+
+x <- vector()
+y <- vector()
+i <- 1
+for (t in 1:num_col) {
+  for (p in 1:num_row) {
+    x[i] = half_matrix_size+1  +t*cos(phi_8_vec[p,t])
+    y[i] = half_matrix_size+1+t*sin(phi_8_vec[p,t])
+    i <- i+1
+  }
+}
+
+# label of each data
+hoverText <- cbind(x=1:matrix_size, y=1:matrix_size, height=as.vector(t(matrix_Fp1_10_smooth))) # tail(mytext)
+custom_txt <- matrix(NA, nrow=matrix_size, ncol=matrix_size)
+
+for (x in 1:matrix_size) {
+  for (y in 1:matrix_size) {
+    t = sqrt((x-half_matrix_size-1)^2 + (y-half_matrix_size-1)^2)
+    p = atan2(y-half_matrix_size-1, x-half_matrix_size-1)
+    custom_txt[x,y] <- paste('Height: ', round(hoverText[(x-1)*matrix_size+y, 3], 3),
+                             '\nTime (t) ', round(t, 4),
+                             '\nPhase (φ)', round(p, 4))}}
+
+
+
+
+# Set up surface grid
+xx2 <- half_matrix_size+1 + seq(0,half_matrix_size,1/2) %o% cos(seq(-pi, pi, 2*pi/(matrix_size-1)))
+yy2 <- half_matrix_size+1 + seq(0,half_matrix_size,1/2) %o% sin(seq(-pi, pi, 2*pi/(matrix_size-1)))
+zz2 <- matrix_Fp1_10_smooth
+
+# Axes and title
+word_font <- list(family = "Courier New, monospace", size = 10, color = "black")
+x_axis <- list(title = "kime-magnitude (t) [Cartesian𝑥 axis] ", titlefont = word_font)
+
+y_axis <- list(title = "kime-phase (φ) [Cartesian y axis]", titlefont = word_font)
+z_axis_range <- c(min(matrix_Fp1_10_smooth) , max(matrix_Fp1_10_smooth))
+z_axis <- list(title = "intensity [Cartesian z axis]", titlefont = word_font, range = z_axis_range) # z- axis range
+title_name <- list(text = "3D kimesurfaces for 0.1 second of Fp1 channel", font = word_font)
+legend_set <- list(title = "intensity", x = 1.05, y = 1, font = list(size = 10), bgcolor = "rgba(255,255,255,0.5)")
+
+
+## plot_ly the graph
+fp1_0.1sec_kime_surface <- plot_ly(
+  x = ~xx2, y = ~yy2, 
+  z = ~zz2,
+  type = "surface",
+  showscale = TRUE,
+  colorbar = legend_set,
+  text = custom_txt,
+  hoverinfo = "text"
+) %>%
+  layout(
+    title = title_name,
+    scene = list(
+      xaxis = x_axis,
+      yaxis = y_axis,
+      zaxis = z_axis
+    )
+  )
+
+fp1_0.1sec_kime_surface
+
+
+```
+
+
+
+
+
+
+```{r}
+##  The function is to create the 3D kimesurfaces 
+##  parameter 
+###   long_data_frame - 100 obs. of  3 variables(Time, channel, voltage)
+###   title_label - the title of kimesurface
+### return 
+##    list [1] - reconstruct_df with itme ,phi, voltage
+###   list [2] -  plot_1 - image of kimesurface
+
+kime_surface_fun<- function(long_data_frame, title_label ){
+  
+  time_data <- long_data_frame$Time
+  min_time <- min(time_data)
+  max_time <- max(time_data)
+  length_data <- length(long_data_frame$Time)
+  max_time <-max(long_data_frame$Time)
+  
+  if(length_data > 100){
+    stop("please load the data frame with less than 100 in time")
+  }
+  num_row <- 8
+  num_col <-length_data
+  # # Generate 8 kime-phases meet 
+  ##  # randomly generate 8 phi kime-phases for each of the 100 time
+
+  
+  phi_8_vec <- matrix(NA, ncol=num_col, nrow = num_row)
+  #if(rand_opt=="laplace"){
+  for (t in 1:num_col) { 
+    # for a given t, generate 8 new phases
+    set.seed(t);
+    phi_8_vec[ ,t] <-
+      extraDistr::rlaplace(num_row,mu=0,sigma=0.5)
+    # rank-order the phases for consistency
+    # within the same foliation leaf
+    phi_8_vec[ ,t] <- sort(phi_8_vec[ ,t])
+    # force phases in [-pi: pi)
+    for (i in 1:num_row) {
+      if (phi_8_vec[i,t] < -pi) 
+        phi_8_vec[i,t] <- -pi
+      if (phi_8_vec[i,t] >= pi) 
+        phi_8_vec[i,t] <- pi
+    }
+  }
+  
+  voltage= long_data_frame$Voltage
+  
+  # reconstructed the data frame
+  phi_containter <- NULL
+  for (i in 1:num_row) {
+    phi_containter <- c(phi_containter, phi_8_vec[i])
+  }
+  
+  phi_containter <- as.vector(phi_8_vec)  
+  time_vec <- rep(1:num_col, each = num_row)  
+  source_vec <- rep(1:num_row, times = num_col) 
+  
+  reconstruct_df <- data.frame(time = time_vec, source = source_vec, phi = phi_containter, voltage = voltage)
+  
+  #set plotly matrix  211 * 211 kime-domain Cartesian
+  matrix_size <- num_col* 2 +11  
+  half_matrix_size <- (matrix_size-1)/2   
+  matrix_plotly <- matrix(NA, nrow=matrix_size, ncol = matrix_size) 
+  
+  #  using phase-based x-y coordinates to fill the matrix
+  for (t in 1:num_col) {
+    for (p in 1:num_row) {
+      x = half_matrix_size+1+t*cos(phi_8_vec[p,t])
+      y = half_matrix_size+1+t*sin(phi_8_vec[p,t])
+      matrix_plotly[x,y]  <- voltage[(p-1)*num_col +t]
+    }
+  }
+  
+  # Reduce the noise, sigma = 5
+  matrix_plotly_smooth <- (1/10000)*as.matrix(blur(as.im(matrix_plotly), sigma=5))
+  
+  
+  # label of each data
+  hoverText <- cbind(x=1:matrix_size, y=1:matrix_size, height=as.vector(t(matrix_plotly_smooth))) # tail(mytext)
+  custom_txt <- matrix(NA, nrow=matrix_size, ncol=matrix_size)
+  
+  for (x in 1:matrix_size) {
+    for (y in 1:matrix_size) {
+      t = sqrt((x-half_matrix_size-1)^2 + (y-half_matrix_size-1)^2)
+      p = atan2(y-half_matrix_size-1, x-half_matrix_size-1)
+      custom_txt[x,y] <- paste('Height: ', round(hoverText[(x-1)*matrix_size+y, 3], 2),
+                               '\nTime (t) ', round(t, 2),
+                               '\nPhase (φ)', round(p, 2))}}
+  
+  
+  # Set up surface grid
+  xx2 <- half_matrix_size+ 1 + seq(0,half_matrix_size,1/2) %o% cos(seq(-pi, pi, 2*pi/(matrix_size-1)))
+  yy2 <- half_matrix_size+1 + seq(0,half_matrix_size,1/2) %o% sin(seq(-pi, pi, 2*pi/(matrix_size-1)))
+  zz2 <- matrix_plotly_smooth
+  
+  # Axes and title
+  word_font <- list(family = "Courier New, monospace", size = 10, color = "black")
+  x_axis <- list(title = "kime-magnitude (t) [Cartesian𝑥 axis] ", titlefont = word_font)
+  
+  y_axis <- list(title = "kime-phase (φ) [Cartesian y axis]", titlefont = word_font)
+  z_axis_range <- c(min(matrix_plotly_smooth) , max(matrix_plotly_smooth))
+  z_axis <- list(title = "intensity [Cartesian z axis]", titlefont = word_font, range = z_axis_range) # z- axis range
+  title_name <- list(text = title_label, font = word_font)
+  legend_set <- list(title = "intensity", x = 1.05, y = 1, font = list(size = 10), bgcolor = "rgba(255,255,255,0.5)")
+  
+  
+  ## plot_ly the graph
+  plot_1 <- plot_ly(
+    x = ~xx2, y = ~yy2, 
+    z = ~zz2,
+    type = "surface",
+    showscale = TRUE,
+    colorbar = legend_set,
+    text = custom_txt,
+    hoverinfo = "text"
+  ) %>%
+    layout(
+      title = title_name,
+      scene = list(
+        xaxis = x_axis,
+        yaxis = y_axis,
+        zaxis = z_axis
+      )
+    )
+  return(list(reconstruct_df, plot_1))
+  
+}
+
+
+```
+
+
+
+```{r}
+# downsample e dataset   100 rows in order to meet the loading structure of kimesurfaces function
+
+# read the data from csv format and return the data
+read_csv_from_each_channel <- function(path, name){
+  path_way <- file.path(path, name)
+  data_ <- read.csv((path_way))
+  return (data_)
+}
+
+library(dplyr)
+# The function is to manipulate the data structure toward the kime_surface_fun funtion's need
+
+data_manipulation_fun <- function(df){
+  num_total <- nrow(df)
+  num_bin <- 100
+  df$bin <- cut(seq_len(num_total), breaks = num_bin, labels = FALSE)
+  new_df <- df %>%
+  group_by( bin) %>%
+  summarise(
+  Time = round((mean(Time)/1000),3), 
+  Voltage = round(mean(Voltage),2),
+  .groups = "drop"
+  )
+  return(new_df)
+}
+
+# This function is to read the file from csv, shrink rows number to less than 100 
+# and print the kimsurface 
+data_manipulation_and_kimesurface <-function(filePath, fileName, Kimesurface_title){
+  read_df <- read.csv(filePath)
+  rebuild_df <- data_manipulation_fun (read_df)
+  ouput_kimesurface <- kime_surface_fun(rebuild_df, Kimesurface_title)[2]
+  return (ouput_kimesurface)
+}
+
 
 
 ```
 
 ```{r}
+
+# each 10 mins of Fp1 channel and its kimesurface.
+
+file_name = "exp1_0101_Fp1"
+Fp1_10_path<- file.path(file_name, "Fp1_10min.csv")
+Fp1_20_path<- file.path(file_name, "Fp1_20min.csv")
+Fp1_30_path<- file.path(file_name, "Fp1_30min.csv")
+Fp1_40_path<- file.path(file_name, "Fp1_40min.csv")
+Fp1_50_path<- file.path(file_name, "Fp1_50min.csv")
+Fp1_60_path<- file.path(file_name, "Fp1_60min.csv")
+Fp1_70_path<- file.path(file_name, "Fp1_60min.csv")
+Fp1_all_time_path <- file.path(file_name, "EEG_Fp1_all_time.csv")
+
+data_manipulation_and_kimesurface(Fp1_10_path, "Fp1_10min.csv" , "3D kimesurfaces for 0 to 10 minutes of fp1 channel")
+data_manipulation_and_kimesurface(Fp1_20_path, "Fp1_20min.csv" , "3D kimesurfaces for 10 to 20 minutes of fp1 channel")
+data_manipulation_and_kimesurface(Fp1_30_path, "Fp1_30min.csv" , "3D kimesurfaces for 20 to 30 minutes of fp1 channel")
+data_manipulation_and_kimesurface(Fp1_40_path, "Fp1_40min.csv" , "3D kimesurfaces for 30 to 40 minutes of fp1 channel")
+data_manipulation_and_kimesurface(Fp1_50_path, "Fp1_50min.csv" , "3D kimesurfaces for 40 to 50 minutes of fp1 channel")
+data_manipulation_and_kimesurface(Fp1_60_path, "Fp1_60min.csv" , "3D kimesurfaces for 50 to 60 minutes of fp1 channel")
+data_manipulation_and_kimesurface(Fp1_70_path, "Fp1_70min.csv" , "3D kimesurfaces for 60 above minutes of fp1 channel")
+data_manipulation_and_kimesurface(Fp1_all_time_path, "EEG_Fp1_all_time" , "3D kimesurfaces for all time of fp1 channel")
+
+
+```
+
+
+```{r}
+## Fp2 channel kimesurface
+
+Fp2_alltime_df <- read_csv_from_each_channel(path_each_channel, "EEG_Fp2_all_time.csv")
+fp2_100row <- data_manipulation_fun(Fp2_alltime_df)
+fp2_kimesurface <- kime_surface_fun(fp2_100row, "3D kimesurfaces of Fp2 (all time)")[2]
+fp2_kimesurface
+```
+
+
+```{r}
+## Fpz channel kimesurface
+
+
+Fpz_alltime_df <- read_csv_from_each_channel(path_each_channel, "EEG_Fpz_all_time.csv")
+fpz_100row <- data_manipulation_fun(Fpz_alltime_df)
+fpz_kimesurface <- kime_surface_fun(fpz_100row, "3D kimesurfaces of Fpz (all time)")[2]
+fpz_kimesurface
+```
+
+```{r}
+Fz_alltime_df <- read_csv_from_each_channel(path_each_channel, "EEG_Fz_all_time.csv")
+fz_100row <- data_manipulation_fun(Fz_alltime_df)
+fz_kimesurface <- kime_surface_fun(fz_100row, "3D kimesurfaces of Fz (all time)")[2]
+fz_kimesurface
+```
+
+
+
+```{r}
+
+
+
+
+
+```
+
+
+```{r}
+
+```
+
